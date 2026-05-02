@@ -107,6 +107,33 @@ async fn save_png_with_dialog(data: String, name: String) -> Result<Option<Strin
     .map_err(|error| format!("Cannot open save dialog: {error}"))?
 }
 
+#[tauri::command]
+async fn save_text_with_dialog(data: String, name: String) -> Result<Option<String>, String> {
+    let file_name = sanitize_markdown_file_name(&name);
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(mut path) = rfd::FileDialog::new()
+            .set_title("保存资源健康报告")
+            .set_file_name(&file_name)
+            .add_filter("Markdown", &["md"])
+            .add_filter("Text", &["txt"])
+            .save_file()
+        else {
+            return Ok(None);
+        };
+
+        if path.extension().is_none() {
+            path.set_extension("md");
+        }
+
+        fs::write(&path, data.as_bytes())
+            .map_err(|error| format!("Cannot write report to {}: {error}", path.display()))?;
+
+        Ok(Some(path.display().to_string()))
+    })
+    .await
+    .map_err(|error| format!("Cannot open save dialog: {error}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -117,7 +144,8 @@ pub fn run() {
             get_launch_model_package,
             open_model_package_from_path,
             open_model_package_from_folder,
-            save_png_with_dialog
+            save_png_with_dialog,
+            save_text_with_dialog
         ])
         .run(tauri::generate_context!())
         .expect("error while running ModelDesk");
@@ -307,6 +335,29 @@ fn sanitize_png_file_name(name: &str) -> String {
     }
     if !sanitized.to_ascii_lowercase().ends_with(".png") {
         sanitized.push_str(".png");
+    }
+    sanitized
+}
+
+fn sanitize_markdown_file_name(name: &str) -> String {
+    let mut sanitized = name
+        .chars()
+        .map(|character| match character {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            character if character.is_control() => '_',
+            character => character,
+        })
+        .collect::<String>()
+        .trim()
+        .to_string();
+
+    if sanitized.is_empty() {
+        sanitized = "modeldesk-resource-report.md".to_string();
+    }
+    if !sanitized.to_ascii_lowercase().ends_with(".md")
+        && !sanitized.to_ascii_lowercase().ends_with(".txt")
+    {
+        sanitized.push_str(".md");
     }
     sanitized
 }

@@ -1,4 +1,4 @@
-(() => {
+(async () => {
   const els = {
     canvas: document.getElementById("renderCanvas"),
     viewportWrap: document.querySelector(".viewport-wrap"),
@@ -32,6 +32,7 @@
     resourceDiagnostics: document.getElementById("resourceDiagnostics"),
     resourceSummary: document.getElementById("resourceSummary"),
     resourceList: document.getElementById("resourceList"),
+    resourceReportButton: document.getElementById("resourceReportButton"),
     hudCamera: document.getElementById("hudCamera"),
     hudZoom: document.getElementById("hudZoom"),
     hudMesh: document.getElementById("hudMesh"),
@@ -170,6 +171,32 @@
     activeMeshId: null,
     highlightedSceneMeshes: []
   };
+
+  const { createResourceTools } = await import("./app/resources.mjs");
+  const resourceTools = createResourceTools({
+    els,
+    textureExtensions,
+    materialExtensions,
+    bufferExtensions,
+    environmentExtensions,
+    buildProjectProfile,
+    getExtension,
+    getFileDisplayPath,
+    shortName,
+    formatCount,
+    formatBytes,
+    escapeHtml,
+    updateViewportHud
+  });
+  const {
+    analyzeModelResources,
+    buildPackageOnlyDiagnostics,
+    augmentResourceDiagnosticsWithRuntime,
+    renderResourceDiagnostics,
+    buildResourceHealthReport,
+    getReferencedResourcePaths,
+    normalizeResourcePath
+  } = resourceTools;
 
   if (!window.BABYLON) {
     setStatus("Babylon.js 未加载，请检查网络或改成本地依赖。", true);
@@ -336,6 +363,7 @@
     els.materialList.addEventListener("input", handleMaterialEditorInput);
     els.materialList.addEventListener("change", handleMaterialEditorChange);
     els.materialShowAllButton?.addEventListener("click", showAllMaterials);
+    els.resourceReportButton?.addEventListener("click", exportResourceHealthReport);
     els.recentList?.addEventListener("click", handleRecentClick);
     els.recentClearButton?.addEventListener("click", clearRecent);
     els.animationSelect?.addEventListener("change", () => selectAnimation(Number(els.animationSelect.value)));
@@ -918,401 +946,38 @@
     return file;
   }
 
-  async function analyzeModelResources(files, mainFile) {
-    const diagnostics = createResourceDiagnostics(files, mainFile);
-    const extension = getExtension(mainFile.name);
-    const index = buildResourceIndex(files);
+  async function exportResourceHealthReport() {
+    const diagnostics = state.resourceDiagnostics;
+    if (!diagnostics) {
+      setStatus("没有可导出的资源诊断结果", true);
+      return;
+    }
+
+    const report = buildResourceHealthReport(diagnostics, state.activeFile);
+    const baseName = state.activeFile ? stripExtension(state.activeFile.name) : diagnostics.stats?.rootName || "资源包";
+    const fileName = `${sanitizeFileName(baseName)}-资源健康报告.md`;
 
     try {
-      if (extension === ".gltf") {
-        const gltf = JSON.parse(await mainFile.text());
-        collectGltfResourceReferences(gltf).forEach((reference) => {
-          recordResourceReference(diagnostics, reference, index, dirnameResourcePath(getFileDisplayPath(mainFile)));
-        });
-        diagnostics.applicable = true;
-      } else if (extension === ".obj") {
-        await analyzeObjResources(files, mainFile, diagnostics, index);
-        diagnostics.applicable = true;
-      } else if (extension === ".babylon") {
-        const scene = JSON.parse(await mainFile.text());
-        collectBabylonResourceReferences(scene).forEach((reference) => {
-          recordResourceReference(diagnostics, reference, index, dirnameResourcePath(getFileDisplayPath(mainFile)));
-        });
-        diagnostics.applicable = true;
-      } else if (extension === ".glb") {
-        diagnostics.applicable = false;
-        diagnostics.note = "GLB 通常已内嵌网格、材质和贴图资源";
+      const savedPath = await saveTextReport(report, fileName);
+      if (savedPath) {
+        setStatus(`已导出资源健康报告：${savedPath}`);
       } else {
-        diagnostics.applicable = false;
-        diagnostics.note = "当前格式没有可静态解析的外部资源清单";
+        setStatus("已取消导出资源健康报告");
       }
     } catch (error) {
-      diagnostics.applicable = true;
-      diagnostics.error = `资源诊断失败：${error?.message || error}`;
-    }
-
-    finalizeResourceDiagnostics(diagnostics);
-    return diagnostics;
-  }
-
-  function buildPackageOnlyDiagnostics(files) {
-    const diagnostics = createResourceDiagnostics(files, null);
-    diagnostics.note = "已导入资源包，但没有找到可加载的模型文件";
-    finalizeResourceDiagnostics(diagnostics);
-    return diagnostics;
-  }
-
-  function createResourceDiagnostics(files, mainFile) {
-    return {
-      applicable: false,
-      total: 0,
-      found: [],
-      missing: [],
-      embedded: 0,
-      remote: 0,
-      warnings: [],
-      error: null,
-      note: "",
-      runtime: null,
-      stats: buildProjectProfile(files, mainFile),
-      summary: ""
-    };
-  }
-
-  function collectGltfResourceReferences(gltf) {
-    const references = [];
-    (gltf.buffers || []).forEach((buffer, index) => {
-      pushResourceReference(references, buffer?.uri, "缓冲", `buffers[${index}]`);
-    });
-    (gltf.images || []).forEach((image, index) => {
-      pushResourceReference(references, image?.uri, "贴图", `images[${index}]`);
-    });
-    return dedupeResourceReferences(references);
-  }
-
-  function collectBabylonResourceReferences(scene) {
-    const references = [];
-    (scene.textures || []).forEach((texture, index) => {
-      pushResourceReference(references, texture?.name || texture?.url, "贴图", `textures[${index}]`);
-    });
-    (scene.cubeTextures || []).forEach((texture, index) => {
-      pushResourceReference(references, texture?.name || texture?.url, "环境", `cubeTextures[${index}]`);
-    });
-    return dedupeResourceReferences(references);
-  }
-
-  async function analyzeObjResources(files, mainFile, diagnostics, index) {
-    const objText = await mainFile.text();
-    const mainDir = dirnameResourcePath(getFileDisplayPath(mainFile));
-    const libraries = parseObjMaterialLibraries(objText);
-
-    if (!libraries.length) {
-      diagnostics.note = "OBJ 未声明 .mtl 材质库";
-      return;
-    }
-
-    for (const library of libraries) {
-      const materialRecord = recordResourceReference(
-        diagnostics,
-        { uri: library, kind: "材质库", source: mainFile.name },
-        index,
-        mainDir
-      );
-      if (!materialRecord?.file) continue;
-
-      try {
-        const materialText = await materialRecord.file.text();
-        const materialDir = dirnameResourcePath(materialRecord.matchedPath || materialRecord.expectedPath);
-        parseMtlTextureReferences(materialText, materialRecord.uri).forEach((reference) => {
-          recordResourceReference(diagnostics, reference, index, materialDir);
-        });
-      } catch (error) {
-        diagnostics.warnings.push({
-          kind: "材质库",
-          uri: library,
-          message: `无法读取材质库：${error?.message || error}`
-        });
-      }
+      setStatus(`导出资源健康报告失败：${error?.message || error}`, true);
+      console.error(error);
     }
   }
 
-  function parseObjMaterialLibraries(text) {
-    return String(text || "")
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => /^mtllib\s+/i.test(line))
-      .flatMap((line) => line.replace(/^mtllib\s+/i, "").split(/\s+/))
-      .filter(Boolean);
-  }
-
-  function parseMtlTextureReferences(text, source) {
-    const textureKeys = new Set([
-      "map_ka",
-      "map_kd",
-      "map_ks",
-      "map_ke",
-      "map_ns",
-      "map_d",
-      "map_bump",
-      "bump",
-      "disp",
-      "decal",
-      "norm",
-      "refl"
-    ]);
-    const references = [];
-    String(text || "")
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith("#"))
-      .forEach((line) => {
-        const parts = line.split(/\s+/);
-        const key = parts.shift()?.toLowerCase();
-        if (!textureKeys.has(key)) return;
-        const uri = extractMtlTextureUri(parts);
-        pushResourceReference(references, uri, "贴图", source);
-      });
-    return dedupeResourceReferences(references);
-  }
-
-  function extractMtlTextureUri(parts) {
-    const values = Array.from(parts || []);
-    if (!values.length) return "";
-    for (let index = values.length - 1; index >= 0; index -= 1) {
-      const token = values[index];
-      if (token && !token.startsWith("-")) return values.slice(index).join(" ");
+  async function saveTextReport(text, fileName) {
+    const invoke = window.__TAURI__?.core?.invoke;
+    if (invoke) {
+      return invoke("save_text_with_dialog", { data: text, name: fileName });
     }
-    return values[values.length - 1] || "";
+    downloadBlob(new Blob([text], { type: "text/markdown;charset=utf-8" }), fileName);
+    return fileName;
   }
-
-  function pushResourceReference(references, uri, kind, source) {
-    if (!uri || typeof uri !== "string") return;
-    const cleaned = cleanResourceUri(uri);
-    if (!cleaned) return;
-    references.push({ uri: cleaned, kind, source });
-  }
-
-  function dedupeResourceReferences(references) {
-    const seen = new Set();
-    return references.filter((reference) => {
-      const key = `${reference.kind}|${reference.uri}|${reference.source || ""}`.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
-
-  function recordResourceReference(diagnostics, reference, index, baseDir) {
-    if (isEmbeddedResource(reference.uri)) {
-      diagnostics.embedded += 1;
-      return null;
-    }
-    if (isRemoteResource(reference.uri)) {
-      diagnostics.remote += 1;
-      return null;
-    }
-
-    const expectedPath = normalizeResourcePath(joinResourcePath(baseDir, reference.uri));
-    const exactFile = index.byPath.get(expectedPath);
-    const fallbackName = normalizeResourcePath(shortName(reference.uri));
-    const nameMatches = index.byName.get(fallbackName) || [];
-    const fallbackFile = !exactFile && nameMatches.length === 1 ? nameMatches[0] : null;
-    const file = exactFile || fallbackFile;
-    const record = {
-      ...reference,
-      expectedPath,
-      matchedPath: file ? normalizeResourcePath(getFileDisplayPath(file)) : "",
-      matchType: exactFile ? "路径" : fallbackFile ? "文件名" : "",
-      file: file || null
-    };
-
-    if (file) {
-      diagnostics.found.push(record);
-    } else {
-      diagnostics.missing.push(record);
-    }
-    return record;
-  }
-
-  function buildResourceIndex(files) {
-    const byPath = new Map();
-    const byName = new Map();
-    Array.from(files || []).forEach((file) => {
-      const path = normalizeResourcePath(getFileDisplayPath(file));
-      const name = normalizeResourcePath(file.name);
-      if (path) byPath.set(path, file);
-      if (!byName.has(name)) byName.set(name, []);
-      byName.get(name).push(file);
-    });
-    return { byPath, byName };
-  }
-
-  function augmentResourceDiagnosticsWithRuntime(diagnostics, container) {
-    if (!diagnostics || !container) return;
-    const textures = collectRuntimeTextures(container);
-    diagnostics.runtime = {
-      textures: textures.length,
-      materials: container.materials?.length || 0
-    };
-    finalizeResourceDiagnostics(diagnostics);
-  }
-
-  function collectRuntimeTextures(container) {
-    const textures = new Map();
-    (container.materials || []).forEach((material) => {
-      (material.getActiveTextures?.() || []).forEach((texture) => {
-        const key = texture.uniqueId || texture.name || texture.url || texture._texture?.url;
-        if (key) textures.set(key, texture);
-      });
-    });
-    return Array.from(textures.values());
-  }
-
-  function finalizeResourceDiagnostics(diagnostics) {
-    diagnostics.total = diagnostics.found.length + diagnostics.missing.length;
-    diagnostics.summary = summarizeResourceDiagnostics(diagnostics);
-    return diagnostics;
-  }
-
-  function summarizeResourceDiagnostics(diagnostics) {
-    if (diagnostics.error) return diagnostics.error;
-    if (diagnostics.missing.length) {
-      return `缺失 ${formatCount(diagnostics.missing.length)} / ${formatCount(diagnostics.total)} 个外部资源`;
-    }
-    if (diagnostics.total) {
-      return `资源完整，${formatCount(diagnostics.total)} 个外部资源可用`;
-    }
-    if (diagnostics.runtime?.textures) {
-      return `未发现外部缺失，运行时贴图 ${formatCount(diagnostics.runtime.textures)} 个`;
-    }
-    return diagnostics.note || "未发现外部资源引用";
-  }
-
-  function isEmbeddedResource(uri) {
-    return /^data:/i.test(uri);
-  }
-
-  function isRemoteResource(uri) {
-    return /^(blob:|https?:\/\/|file:)/i.test(uri);
-  }
-
-  function cleanResourceUri(uri) {
-    const clean = String(uri || "").split("#")[0].split("?")[0].replaceAll("\\", "/").trim();
-    try {
-      return decodeURIComponent(clean);
-    } catch {
-      return clean;
-    }
-  }
-
-  function dirnameResourcePath(path) {
-    const normalized = normalizeResourcePath(path);
-    const slash = normalized.lastIndexOf("/");
-    return slash >= 0 ? normalized.slice(0, slash) : "";
-  }
-
-  function joinResourcePath(base, relative) {
-    return [base, relative].filter(Boolean).join("/");
-  }
-
-  function normalizeResourcePath(path) {
-    const parts = String(path || "")
-      .replaceAll("\\", "/")
-      .split("/")
-      .filter((part) => part && part !== ".");
-    const normalized = [];
-    parts.forEach((part) => {
-      if (part === "..") {
-        normalized.pop();
-      } else {
-        normalized.push(part);
-      }
-    });
-    return normalized.join("/").toLowerCase();
-  }
-
-  function renderResourceDiagnostics(diagnostics) {
-    if (!els.resourceSummary || !els.resourceList) return;
-
-    const missingCount = diagnostics?.missing?.length || 0;
-    const warningCount = diagnostics?.warnings?.length || 0;
-    if (els.resourcePanelTitle) {
-      els.resourcePanelTitle.textContent = missingCount ? `资源 (${formatCount(missingCount)})` : "资源";
-    }
-
-    els.resourceDiagnostics?.classList.toggle("has-warning", Boolean(missingCount || warningCount || diagnostics?.error));
-
-    if (!diagnostics) {
-      els.resourceSummary.innerHTML = `<strong>未载入模型</strong><span>选择模型或拖入文件夹后显示依赖诊断</span>`;
-      els.resourceList.innerHTML = "";
-      updateViewportHud();
-      return;
-    }
-
-    els.resourceSummary.innerHTML = renderResourceSummary(diagnostics);
-
-    const rows = [];
-    if (diagnostics.error) {
-      rows.push(renderResourceMessage("错误", diagnostics.error, "is-missing"));
-    }
-    rows.push(...diagnostics.missing.slice(0, 12).map((item) => renderResourceRow(item, "missing")));
-    if (diagnostics.missing.length > 12) {
-      rows.push(renderResourceMessage("缺失", `另有 ${formatCount(diagnostics.missing.length - 12)} 个缺失资源`, "is-muted"));
-    }
-    if (!diagnostics.missing.length) {
-      rows.push(...diagnostics.found.slice(0, 8).map((item) => renderResourceRow(item, "found")));
-    }
-    rows.push(...diagnostics.warnings.slice(0, 4).map((item) => renderResourceMessage("提示", item.message, "is-warning")));
-
-    els.resourceList.innerHTML = rows.join("");
-    updateViewportHud();
-  }
-
-  function renderResourceSummary(diagnostics) {
-    const stats = diagnostics.stats || {};
-    const chips = [
-      ["模型", stats.models],
-      ["贴图", stats.textures],
-      ["材质包", stats.materials],
-      ["缓冲", stats.buffers],
-      ["环境", stats.environments]
-    ]
-      .filter(([, value]) => value)
-      .map(([label, value]) => `<span>${label} ${formatCount(value)}</span>`)
-      .join("");
-    const runtime = diagnostics.runtime?.textures
-      ? `<span>运行时贴图 ${formatCount(diagnostics.runtime.textures)}</span>`
-      : "";
-    const embedded = diagnostics.embedded ? `<span>内嵌 ${formatCount(diagnostics.embedded)}</span>` : "";
-    const remote = diagnostics.remote ? `<span>远程 ${formatCount(diagnostics.remote)}</span>` : "";
-    return `<strong>${escapeHtml(diagnostics.summary || "资源诊断完成")}</strong>
-      <small>${escapeHtml(stats.rootName || "当前资源包")} · ${formatBytes(stats.totalBytes || 0)} / ${formatCount(stats.totalFiles || 0)} 个文件</small>
-      <div class="resource-metrics">${chips}${runtime}${embedded}${remote}</div>`;
-  }
-
-  function renderResourceRow(item, status) {
-    const found = status === "found";
-    const classes = ["resource-row", found ? "is-found" : "is-missing"].join(" ");
-    const label = found ? "正常" : "缺失";
-    const detail = found
-      ? `${item.kind || "资源"} · ${item.matchType || "路径"}匹配 · ${item.matchedPath || item.expectedPath}`
-      : `${item.kind || "资源"} · 期望路径 ${item.expectedPath || item.uri}`;
-    return `<div class="${classes}" title="${escapeHtml(detail)}">
-      <span>${label}</span>
-      <div>
-        <strong>${escapeHtml(shortName(item.uri))}</strong>
-        <small>${escapeHtml(detail)}</small>
-      </div>
-    </div>`;
-  }
-
-  function renderResourceMessage(label, message, className) {
-    return `<div class="resource-row ${className}">
-      <span>${escapeHtml(label)}</span>
-      <div><strong>${escapeHtml(message)}</strong></div>
-    </div>`;
-  }
-
   function base64ToBytes(value) {
     const binary = window.atob(value);
     const bytes = new Uint8Array(binary.length);
@@ -1408,15 +1073,6 @@
       <small>${formatBytes(profile.totalBytes)} / ${formatCount(profile.totalFiles)} 个文件</small>
     </div>
     <div class="project-metrics">${metrics || `<span>资源 ${formatCount(profile.others)}</span>`}</div>`;
-  }
-
-  function getReferencedResourcePaths(diagnostics) {
-    const paths = new Set();
-    (diagnostics?.found || []).forEach((item) => {
-      const path = normalizeResourcePath(item.matchedPath || item.expectedPath);
-      if (path) paths.add(path);
-    });
-    return paths;
   }
 
   function renderFileTree(files = state.activeFiles, activeFile = state.activeFile) {

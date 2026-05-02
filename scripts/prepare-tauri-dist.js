@@ -4,7 +4,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const dist = path.join(root, "dist");
 const files = ["index.html", "styles.css", "app.js"];
-const directories = ["vendor"];
+const directories = ["app", "vendor"];
 
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });

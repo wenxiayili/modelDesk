@@ -1779,6 +1779,18 @@ svg {
   white-space: nowrap;
 }
 
+.resource-advice {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #6f7d8f;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .resource-row.is-missing {
   border-color: #e6b379;
   background: #fff9f1;
@@ -1794,6 +1806,10 @@ svg {
 
 .resource-row.is-warning span {
   color: #ad6120;
+}
+
+.resource-row.is-unused span {
+  color: #6b7a8d;
 }
 
 .resource-row.is-muted {
@@ -1819,6 +1835,10 @@ body.is-dark .resource-row.is-warning span {
 body.is-dark .resource-row strong,
 body.is-dark .measure-row strong {
   color: #e6edf4;
+}
+
+body.is-dark .resource-advice {
+  color: #91a1b4;
 }
 
 .measure-panel {
