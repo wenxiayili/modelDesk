@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>模型工作台 - 三维模型查看器</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2311857f'/%3E%3Cpath d='M16 6 25 11v10l-9 5-9-5V11Z' fill='none' stroke='white' stroke-width='2.4' stroke-linejoin='round'/%3E%3Cpath d='M7.4 11.2 16 16l8.6-4.8M16 16v9' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="./vendor/babylon/babylon.js"></script>
+    <script defer src="./vendor/babylon/babylonjs.loaders.min.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three/build/three.module.js",
+          "three/addons/": "./vendor/three/examples/jsm/"
+        }
+      }
+    </script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-folder" viewBox="0 0 24 24">
+        <path d="M3.75 6.8a2 2 0 0 1 2-2h4.2l1.95 2.15h6.35a2 2 0 0 1 2 2v8.25a2 2 0 0 1-2 2H5.75a2 2 0 0 1-2-2Z" />
+      </symbol>
+      <symbol id="icon-box" viewBox="0 0 24 24">
+        <path d="m12 3.75 7.25 4.1v8.3L12 20.25l-7.25-4.1v-8.3Z" />
+        <path d="M4.95 8.05 12 12.1l7.05-4.05" />
+        <path d="M12 12.1v8" />
+      </symbol>
+      <symbol id="icon-fit" viewBox="0 0 24 24">
+        <path d="M8.5 4.5h-4v4" />
+        <path d="M15.5 4.5h4v4" />
+        <path d="M8.5 19.5h-4v-4" />
+        <path d="M15.5 19.5h4v-4" />
+        <path d="M9 9h6v6H9z" />
+      </symbol>
+      <symbol id="icon-reset" viewBox="0 0 24 24">
+        <path d="M4.8 11a7.3 7.3 0 1 1 2.1 5.15" />
+        <path d="M4.8 6.3V11h4.7" />
+      </symbol>
+      <symbol id="icon-wire" viewBox="0 0 24 24">
+        <path d="M12 3.75 20 8.25v7.5l-8 4.5-8-4.5v-7.5Z" />
+        <path d="m4.35 8.45 7.65 4.3 7.65-4.3" />
+        <path d="M12 12.75v7.1" />
+        <path d="M7.55 6.5 16.45 18" />
+        <path d="m16.45 6.5-8.9 11.5" />
+      </symbol>
+      <symbol id="icon-camera" viewBox="0 0 24 24">
+        <path d="M5.2 7.6h3l1.35-2h4.9l1.35 2h3a1.9 1.9 0 0 1 1.9 1.9v7a1.9 1.9 0 0 1-1.9 1.9H5.2a1.9 1.9 0 0 1-1.9-1.9v-7a1.9 1.9 0 0 1 1.9-1.9Z" />
+        <path d="M12 10.15a3.1 3.1 0 1 0 0 6.2 3.1 3.1 0 0 0 0-6.2Z" />
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24">
+        <path d="M8 5.8v12.4l10-6.2Z" />
+      </symbol>
+      <symbol id="icon-sun" viewBox="0 0 24 24">
+        <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
+        <path d="M12 2.8v2.1M12 19.1v2.1M4.7 4.7l1.5 1.5M17.8 17.8l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.7 19.3l1.5-1.5M17.8 6.2l1.5-1.5" />
+      </symbol>
+      <symbol id="icon-menu" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="icon-filter" viewBox="0 0 24 24">
+        <path d="M4 5h16l-6.2 7.2v4.6l-3.6 2.2v-6.8Z" />
+      </symbol>
+      <symbol id="icon-eye" viewBox="0 0 24 24">
+        <path d="M2.8 12s3.4-5.7 9.2-5.7 9.2 5.7 9.2 5.7-3.4 5.7-9.2 5.7S2.8 12 2.8 12Z" />
+        <path d="M12 9.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2Z" />
+      </symbol>
+      <symbol id="icon-pin" viewBox="0 0 24 24">
+        <path d="m14.7 4.5 4.8 4.8-3.2 1.2-3.7 3.7.2 4.3-1 1-3.1-5.2-5.2-3.1 1-1 4.3.2 3.7-3.7Z" />
+      </symbol>
+      <symbol id="icon-target" viewBox="0 0 24 24">
+        <path d="M12 4v3M12 17v3M4 12h3M17 12h3" />
+        <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" />
+      </symbol>
+      <symbol id="icon-move" viewBox="0 0 24 24">
+        <path d="M12 3v18M3 12h18M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4" />
+      </symbol>
+      <symbol id="icon-ruler" viewBox="0 0 24 24">
+        <path d="m4.5 16.5 12-12 3 3-12 12Z" />
+        <path d="m8 13 1.5 1.5M10.7 10.3l1.5 1.5M13.4 7.6l1.5 1.5" />
+      </symbol>
+      <symbol id="icon-fullscreen" viewBox="0 0 24 24">
+        <path d="M8.5 4.5h-4v4M15.5 4.5h4v4M8.5 19.5h-4v-4M15.5 19.5h4v-4" />
+      </symbol>
+      <symbol id="icon-gear" viewBox="0 0 24 24">
+        <path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Z" />
+        <path d="M19.2 12.9a7.5 7.5 0 0 0 0-1.8l2-1.55-2-3.45-2.48 1a7.4 7.4 0 0 0-1.55-.9L14.8 3.5h-4l-.37 2.7a7.4 7.4 0 0 0-1.55.9l-2.48-1-2 3.45 2 1.55a7.5 7.5 0 0 0 0 1.8l-2 1.55 2 3.45 2.48-1c.48.36 1 .66 1.55.9l.37 2.7h4l.37-2.7c.55-.24 1.07-.54 1.55-.9l2.48 1 2-3.45Z" />
+      </symbol>
+      <symbol id="icon-help" viewBox="0 0 24 24">
+        <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
+        <path d="M9.6 9.25a2.55 2.55 0 0 1 4.8 1.2c0 1.95-2.15 2.15-2.15 3.65" />
+        <path d="M12 17.25h.01" />
+      </symbol>
+      <symbol id="icon-chevron" viewBox="0 0 24 24">
+        <path d="m7.5 9 4.5 4.5L16.5 9" />
+      </symbol>
+    </svg>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <nav class="toolbar" aria-label="模型工具栏">
+          <button class="tool-button icon-only" id="mainMenuButton" type="button" title="菜单">
+            <svg><use href="#icon-menu"></use></svg>
+          </button>
+          <span class="toolbar-divider" aria-hidden="true"></span>
+          <button class="tool-button" id="openFileButton" type="button" title="打开模型文件">
+            <svg><use href="#icon-folder"></use></svg>
+            <span>打开</span>
+          </button>
+          <span class="toolbar-divider" aria-hidden="true"></span>
+          <button class="tool-button" id="resetButton" type="button" title="重置视图">
+            <svg><use href="#icon-reset"></use></svg>
+            <span>重置</span>
+          </button>
+          <span class="toolbar-divider" aria-hidden="true"></span>
+          <button class="tool-button" id="fitButton" type="button" title="适配模型">
+            <svg><use href="#icon-fit"></use></svg>
+            <span>适配模型</span>
+          </button>
+          <button class="tool-button" id="wireButton" type="button" title="切换线框">
+            <svg><use href="#icon-wire"></use></svg>
+            <span>线框</span>
+          </button>
+          <button class="tool-button" id="shotButton" type="button" title="导出截图">
+            <svg><use href="#icon-camera"></use></svg>
+            <span>截图</span>
+          </button>
+        </nav>
+
+        <div class="topbar-spacer"></div>
+        <select class="camera-select" id="cameraSelect" aria-label="相机">
+          <option value="default">默认相机</option>
+          <option value="front">前视 +Z</option>
+          <option value="back">后视 -Z</option>
+          <option value="right">右视 +X</option>
+          <option value="left">左视 -X</option>
+          <option value="top">顶视 +Y</option>
+          <option value="bottom">底视 -Y</option>
+        </select>
+        <div class="utility-actions">
+          <button id="themeButton" type="button" title="切换主题"><svg><use href="#icon-sun"></use></svg></button>
+          <button id="settingsButton" type="button" title="快速设置"><svg><use href="#icon-gear"></use></svg></button>
+          <button id="helpButton" type="button" title="帮助"><svg><use href="#icon-help"></use></svg></button>
+        </div>
+        <div class="utility-popover" id="settingsPopover" hidden>
+          <strong>快速设置</strong>
+          <label><span>网格地面</span><input id="quickGridToggle" type="checkbox" checked /></label>
+          <label><span>坐标轴</span><input id="quickAxisToggle" type="checkbox" checked /></label>
+          <label><span>环境反射</span><input id="quickEnvToggle" type="checkbox" checked /></label>
+        </div>
+        <div class="utility-popover help-popover" id="helpPopover" hidden>
+          <strong>模型工作台</strong>
+          <span>支持 .glb / .gltf / .obj / .stl / .fbx / .babylon</span>
+          <span>双击关联文件可直接加载</span>
+        </div>
+
+        <input id="fileInput" class="visually-hidden" type="file" multiple accept=".glb,.gltf,.obj,.stl,.fbx,.babylon,.bin,.mtl,.png,.jpg,.jpeg,.webp,.bmp,.tga,.dds,.ktx,.ktx2" />
+        <input id="folderInput" class="visually-hidden" type="file" multiple webkitdirectory directory />
+      </header>
+
+      <main class="workspace">
+        <aside class="side-panel left-panel" aria-label="文件面板">
+          <section class="panel-section file-browser">
+            <div class="panel-heading">
+              <div class="section-title">文件</div>
+              <div class="panel-actions">
+                <button id="fileTreeAddButton" type="button" title="添加文件夹"><span>+</span></button>
+                <button id="fileTreeRefreshButton" type="button" title="刷新">↻</button>
+              </div>
+            </div>
+            <label class="filter-box">
+              <input id="fileSearchInput" type="search" placeholder="筛选文件..." />
+              <svg><use href="#icon-filter"></use></svg>
+            </label>
+            <div class="project-summary" id="projectSummary" hidden></div>
+            <div class="file-tree" id="fileTree">
+              <div class="tree-folder is-open">
+                <span class="tree-caret">▾</span>
+                <svg class="tree-folder-icon"><use href="#icon-folder"></use></svg>
+                <strong>模型</strong>
+                <small>0 个模型</small>
+              </div>
+              <div class="tree-file is-active" id="activeTreeFile">
+                <span class="tree-spacer"></span>
+                <svg class="tree-item-icon"><use href="#icon-box"></use></svg>
+                <span class="tree-file-label">无模型</span>
+                <svg class="tree-status"><use href="#icon-eye"></use></svg>
+              </div>
+              <div class="tree-folder">
+                <span class="tree-caret">›</span>
+                <svg class="tree-folder-icon"><use href="#icon-folder"></use></svg>
+                <strong>资源</strong>
+                <small>0 个文件</small>
+              </div>
+              <div class="tree-folder">
+                <span class="tree-caret">›</span>
+                <svg class="tree-folder-icon"><use href="#icon-folder"></use></svg>
+                <strong>示例</strong>
+                <small>0 个文件</small>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel-section grow">
+            <div class="section-title" id="scenePanelTitle">场景层级</div>
+            <label class="filter-box scene-filter">
+              <input id="sceneSearchInput" type="search" placeholder="筛选网格..." />
+              <svg><use href="#icon-filter"></use></svg>
+            </label>
+            <div class="empty-list" id="meshList">未载入模型</div>
+          </section>
+        </aside>
+
+        <section class="viewport-wrap" aria-label="三维视口">
+          <canvas id="renderCanvas"></canvas>
+          <div class="viewport-overlay" id="emptyOverlay">
+            <div class="overlay-card">
+              <svg><use href="#icon-box"></use></svg>
+              <strong>等待模型</strong>
+              <span>选择文件或把模型拖到窗口中</span>
+            </div>
+          </div>
+          <div class="view-chip view-chip-left" id="viewChip">透视 / 默认光照</div>
+          <div class="view-chip view-chip-right" id="modelBadge">无模型</div>
+          <div class="viewport-hud" aria-label="视口状态">
+            <div><span>相机</span><strong id="hudCamera">默认</strong></div>
+            <div><span>缩放</span><strong id="hudZoom">-</strong></div>
+            <div><span>网格</span><strong id="hudMesh">0</strong></div>
+            <div><span>尺寸</span><strong id="hudBounds">-</strong></div>
+            <div><span>资源</span><strong id="hudResources">-</strong></div>
+          </div>
+          <div class="view-cube" aria-label="视角控件">
+            <div class="cube-box" aria-hidden="true">
+              <span class="cube-face cube-face-top">Y</span>
+              <span class="cube-face cube-face-front">Z</span>
+              <span class="cube-face cube-face-right">X</span>
+            </div>
+            <button class="cube-direction cube-direction-top" type="button" data-view-preset="top" title="顶视 +Y">+Y</button>
+            <button class="cube-direction cube-direction-bottom" type="button" data-view-preset="bottom" title="底视 -Y">-Y</button>
+            <button class="cube-direction cube-direction-right" type="button" data-view-preset="right" title="右视 +X">+X</button>
+            <button class="cube-direction cube-direction-left" type="button" data-view-preset="left" title="左视 -X">-X</button>
+            <button class="cube-direction cube-direction-front" type="button" data-view-preset="front" title="前视 +Z">+Z</button>
+            <button class="cube-direction cube-direction-back" type="button" data-view-preset="back" title="后视 -Z">-Z</button>
+          </div>
+          <div class="canvas-toolbar" aria-label="视口工具">
+            <button id="viewFitButton" type="button" title="适配视图"><svg><use href="#icon-fit"></use></svg></button>
+            <button id="viewResetButton" type="button" title="重置视角"><svg><use href="#icon-reset"></use></svg></button>
+            <button id="viewWireButton" type="button" title="线框"><svg><use href="#icon-wire"></use></svg></button>
+            <button id="viewRotateButton" type="button" title="旋转"><svg><use href="#icon-play"></use></svg></button>
+            <button id="viewPanButton" type="button" title="平移视图"><svg><use href="#icon-move"></use></svg></button>
+            <button id="viewMeasureButton" type="button" title="测量距离"><svg><use href="#icon-ruler"></use></svg></button>
+            <button id="viewShotButton" type="button" title="截图"><svg><use href="#icon-camera"></use></svg></button>
+            <button id="viewFullscreenButton" type="button" title="全屏"><svg><use href="#icon-fullscreen"></use></svg></button>
+          </div>
+          <div class="screenshot-popover" id="screenshotPopover" hidden>
+            <div class="screenshot-head">
+              <strong>截图导出</strong>
+              <button id="screenshotCloseButton" type="button" title="关闭">×</button>
+            </div>
+            <label>
+              <span>倍率</span>
+              <select id="screenshotScaleSelect">
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+              </select>
+            </label>
+            <label>
+              <span>透明背景</span>
+              <input id="screenshotTransparentToggle" type="checkbox" />
+            </label>
+            <div class="screenshot-actions">
+              <button id="screenshotCopyButton" type="button">复制</button>
+              <button id="screenshotSaveButton" type="button">保存 PNG</button>
+            </div>
+          </div>
+          <div class="progress-panel" id="progressPanel" hidden>
+            <span id="progressLabel">加载中</span>
+            <div class="progress-track"><div id="progressBar"></div></div>
+          </div>
+          <div class="measure-label" id="measureLabel" hidden></div>
+        </section>
+
+        <aside class="side-panel right-panel" aria-label="属性面板">
+          <section class="panel-section is-collapsible" data-collapsible-panel data-panel-key="model">
+            <div class="panel-heading panel-heading-toggle">
+              <button class="panel-toggle" type="button" data-panel-toggle aria-expanded="true">
+                <span class="section-title">模型</span>
+                <svg><use href="#icon-chevron"></use></svg>
+              </button>
+            </div>
+            <dl class="info-grid" id="modelInfo">
+              <div><dt>文件</dt><dd>-</dd></div>
+              <div><dt>格式</dt><dd>-</dd></div>
+              <div><dt>加载</dt><dd>-</dd></div>
+              <div><dt>文件大小</dt><dd>-</dd></div>
+              <div><dt>网格</dt><dd>-</dd></div>
+              <div><dt>三角面</dt><dd>-</dd></div>
+              <div><dt>顶点</dt><dd>-</dd></div>
+              <div><dt>材质</dt><dd>-</dd></div>
+              <div><dt>骨骼</dt><dd>-</dd></div>
+              <div><dt>动画</dt><dd>-</dd></div>
+              <div><dt>包围盒</dt><dd>-</dd></div>
+            </dl>
+          </section>
+
+          <section class="panel-section is-collapsible" data-collapsible-panel data-panel-key="resources">
+            <div class="panel-heading panel-heading-toggle">
+              <button class="panel-toggle" type="button" data-panel-toggle aria-expanded="true">
+                <span class="section-title" id="resourcePanelTitle">资源</span>
+                <svg><use href="#icon-chevron"></use></svg>
+              </button>
+            </div>
+            <div class="resource-diagnostics" id="resourceDiagnostics">
+              <div class="resource-summary" id="resourceSummary">未载入模型</div>
+              <div class="resource-list" id="resourceList"></div>
+            </div>
+          </section>
+
+          <section class="panel-section is-collapsible" data-collapsible-panel data-panel-key="animation">
+            <div class="panel-heading panel-heading-toggle">
+              <button class="panel-toggle" type="button" data-panel-toggle aria-expanded="true">
+                <span class="section-title" id="animationPanelTitle">动画</span>
+                <svg><use href="#icon-chevron"></use></svg>
+              </button>
+            </div>
+            <div class="animation-panel">
+              <select id="animationSelect" class="animation-select" disabled>
+                <option value="">无动画</option>
+              </select>
+              <div class="animation-actions">
+                <button id="animationPlayButton" type="button" disabled title="播放 / 暂停"><svg><use href="#icon-play"></use></svg></button>
+                <button id="animationStopButton" type="button" disabled title="停止"><svg><use href="#icon-reset"></use></svg></button>
+              </div>
+              <label class="range-row with-value animation-speed">
+                <span>速度</span>
+                <input id="animationSpeedRange" type="range" min="0.1" max="2.5" step="0.1" value="1" disabled />
+                <input id="animationSpeedValue" class="number-input" type="number" min="0.1" max="2.5" step="0.1" value="1.0" disabled />
+              </label>
+              <div class="empty-list" id="animationList">未载入动画</div>
+            </div>
+          </section>
+
+          <section class="panel-section is-collapsible" data-collapsible-panel data-panel-key="display">
+            <div class="panel-heading panel-heading-toggle">
+              <button class="panel-toggle" type="button" data-panel-toggle aria-expanded="true">
+                <span class="section-title">显示</span>
+                <svg><use href="#icon-chevron"></use></svg>
+              </button>
+            </div>
+            <div class="switch-row">
+              <span>网格地面</span>
+              <label class="switch">
+                <input id="gridToggle" type="checkbox" checked />
+                <span></span>
+              </label>
+            </div>
+            <div class="switch-row">
+              <span>坐标轴</span>
+              <label class="switch">
+                <input id="axisToggle" type="checkbox" checked />
+                <span></span>
+              </label>
+            </div>
+            <div class="switch-row">
+              <span>环境反射</span>
+              <label class="switch">
+                <input id="envToggle" type="checkbox" checked />
+                <span></span>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel-section is-collapsible" data-collapsible-panel data-panel-key="measure">
+            <div class="panel-heading panel-heading-toggle with-actions">
+              <button class="panel-toggle" type="button" data-panel-toggle aria-expanded="true">
+                <span class="section-title" id="measurePanelTitle">测量</span>
+                <svg><use href="#icon-chevron"></use></svg>
+              </button>
+              <button class="panel-action-text" id="measureClearButton" type="button" disabled>清空</button>
+            </div>
+            <div class="measure-panel">
+              <div class="measure-summary" id="measureSummary">未载入模型</div>
+              <div class="measure-history" id="measureHistory"></div>
+            </div>
+          </section>
+
+          <section class="panel-section is-collapsible" data-collapsible-panel data-panel-key="lighting">
+            <div class="panel-heading panel-heading-toggle">
+              <button class="panel-toggle" type="button" data-panel-toggle aria-expanded="true">
+                <span class="section-title">光照</span>
+                <svg><use href="#icon-chevron"></use></svg>
+              </button>
+            </div>
+            <label class="range-row with-value">
+              <span>曝光</span>
+              <input id="exposureRange" type="range" min="0.6" max="1.8" step="0.05" value="1" />
+              <input id="exposureValue" class="number-input" type="number" min="0.6" max="1.8" step="0.05" value="1.00" />
+            </label>
+            <div class="light-control">
+              <div class="light-head">
+                <strong>直射光</strong>
+                <label class="switch"><input id="keyLightToggle" type="checkbox" checked /><span></span></label>
+              </div>
+              <div class="light-fields">
+                <input id="keyLightColor" class="light-color" type="color" value="#fff1d6" title="直射光颜色" />
+                <input id="keyRange" type="range" min="0" max="2.5" step="0.05" value="1.1" />
+                <input id="keyLightValue" class="number-input" type="number" min="0" max="2.5" step="0.05" value="1.10" />
+              </div>
+            </div>
+            <div class="light-control">
+              <div class="light-head">
+                <strong>半球光</strong>
+                <label class="switch"><input id="ambientLightToggle" type="checkbox" checked /><span></span></label>
+              </div>
+              <div class="light-fields">
+                <input id="ambientLightColor" class="light-color" type="color" value="#d8ecff" title="半球光颜色" />
+                <input id="ambientRange" type="range" min="0" max="1.6" step="0.05" value="0.7" />
+                <input id="ambientLightValue" class="number-input" type="number" min="0" max="1.6" step="0.05" value="0.70" />
+              </div>
+            </div>
+            <div class="light-control">
+              <div class="light-head">
+                <strong>点光</strong>
+                <label class="switch"><input id="pointLightToggle" type="checkbox" /><span></span></label>
+              </div>
+              <div class="light-fields">
+                <input id="pointLightColor" class="light-color" type="color" value="#ffffff" title="点光颜色" />
+                <input id="pointRange" type="range" min="0" max="2.5" step="0.05" value="1" />
+                <input id="pointLightValue" class="number-input" type="number" min="0" max="2.5" step="0.05" value="1.00" />
+              </div>
+            </div>
+          </section>
+
+          <section class="panel-section is-collapsible" data-collapsible-panel data-panel-key="environment">
+            <div class="panel-heading panel-heading-toggle">
+              <button class="panel-toggle" type="button" data-panel-toggle aria-expanded="true">
+                <span class="section-title">环境</span>
+                <svg><use href="#icon-chevron"></use></svg>
+              </button>
+            </div>
+            <div class="environment-preview">
+              <div class="env-thumb"></div>
+              <div>
+                <strong id="environmentName">工作室</strong>
+                <span id="environmentFile">内置环境</span>
+              </div>
+            </div>
+            <label class="select-row">
+              <span>预设</span>
+              <select id="envPresetSelect">
+                <option value="studio">工作室</option>
+                <option value="none">无</option>
+                <option value="custom">自定义</option>
+              </select>
+            </label>
+            <div class="file-row">
+              <span>环境图</span>
+              <button id="hdriButton" type="button">选择</button>
+              <strong id="hdriName">内置环境</strong>
+            </div>
+            <input id="hdriInput" class="visually-hidden" type="file" accept=".env,.hdr" />
+            <label class="range-row with-value">
+              <span>旋转</span>
+              <input id="envRotationRange" type="range" min="0" max="360" step="1" value="0" />
+              <input id="envRotationValue" class="number-input" type="number" min="0" max="360" step="1" value="0" />
+            </label>
+          </section>
+
+          <section class="panel-section grow is-collapsible" data-collapsible-panel data-panel-key="materials">
+            <div class="panel-heading panel-heading-toggle with-actions">
+              <button class="panel-toggle" type="button" data-panel-toggle aria-expanded="true">
+                <span class="section-title" id="materialPanelTitle">材质</span>
+                <svg><use href="#icon-chevron"></use></svg>
+              </button>
+              <button class="panel-action-text" id="materialShowAllButton" type="button" disabled>全部显示</button>
+            </div>
+            <div class="empty-list" id="materialList">未载入材质</div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="statusbar">
+        <div class="footer-progress">
+          <span id="footerProgressLabel">就绪</span>
+          <div class="footer-progress-track"><div id="footerProgressBar"></div></div>
+        </div>
+        <div class="footer-metric"><svg><use href="#icon-wire"></use></svg><span>三角面</span><strong id="metricTriangles">0</strong></div>
+        <div class="footer-metric"><svg><use href="#icon-target"></use></svg><span>顶点</span><strong id="metricVertices">0</strong></div>
+        <div class="footer-metric"><svg><use href="#icon-box"></use></svg><span>网格</span><strong id="metricMeshes">0</strong></div>
+        <div class="footer-metric"><svg><use href="#icon-sun"></use></svg><span>材质</span><strong id="metricMaterials">0</strong></div>
+        <div class="footer-metric"><svg><use href="#icon-target"></use></svg><span>绘制调用</span><strong id="metricDrawCalls">0</strong></div>
+        <div class="footer-metric"><span>帧率</span><strong id="metricFps">0</strong></div>
+        <span id="statusText">就绪</span>
+        <span id="engineStatus">渲染引擎初始化中</span>
+      </footer>
+    </div>
+  </body>
+</html>

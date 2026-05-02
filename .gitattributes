@@ -1,0 +1,12 @@
+* text=auto
+
+vendor/** linguist-vendored
+src-tauri/gen/** linguist-generated
+package-lock.json linguist-generated
+src-tauri/Cargo.lock linguist-generated
+
+dist/ export-ignore
+node_modules/ export-ignore
+src-tauri/target/ export-ignore
+.playwright-cli/ export-ignore
+

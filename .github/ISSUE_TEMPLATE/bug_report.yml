@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible problem in ModelDesk.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please include enough detail to reproduce it locally.
+  - type: input
+    id: version
+    attributes:
+      label: ModelDesk version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: Model format
+      options:
+        - GLB
+        - glTF
+        - OBJ
+        - STL
+        - FBX
+        - Babylon
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots or sample model
+      description: Attach screenshots or a minimal sample model package if possible.
+

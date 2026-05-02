@@ -1,0 +1,23 @@
+[package]
+name = "modeldesk"
+version = "0.1.0"
+description = "Lightweight Babylon.js model viewer"
+authors = ["ModelDesk"]
+license = "MIT"
+repository = "https://github.com/wenxiayili/modelDesk"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "modeldesk_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+base64 = "0.22"
+rfd = "0.17.2"
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2.4.1"

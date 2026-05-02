@@ -1,0 +1,37 @@
+{
+  "name": "modeldesk",
+  "version": "0.1.0",
+  "description": "A lightweight offline 3D model viewer built with Babylon.js and Tauri.",
+  "license": "MIT",
+  "homepage": "https://github.com/wenxiayili/modelDesk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wenxiayili/modelDesk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wenxiayili/modelDesk/issues"
+  },
+  "keywords": [
+    "babylonjs",
+    "tauri",
+    "3d-model-viewer",
+    "gltf",
+    "glb",
+    "fbx",
+    "obj",
+    "stl"
+  ],
+  "type": "commonjs",
+  "scripts": {
+    "frontend:dev": "node scripts/serve-static.js",
+    "frontend:build": "node scripts/prepare-tauri-dist.js",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "three": "^0.164.1"
+  }
+}

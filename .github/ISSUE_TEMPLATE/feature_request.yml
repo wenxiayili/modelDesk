@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest an improvement for ModelDesk.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is currently hard or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should ModelDesk do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Model loading
+        - Resource diagnostics
+        - Materials
+        - Lighting
+        - Measurement
+        - UI
+        - Packaging
+        - Other
+
