@@ -62,6 +62,7 @@ jobs:
           node --check app/measurements.mjs
           node --check app/resources.mjs
           node --check app/scene-meshes.mjs
+          node --check app/scene-runtime.mjs
           node --check app/screenshot.mjs
           node --check app/status-hud.mjs
           node --check app/ui-controls.mjs
@@ -84,6 +85,7 @@ jobs:
           node --check dist/app/measurements.mjs
           node --check dist/app/resources.mjs
           node --check dist/app/scene-meshes.mjs
+          node --check dist/app/scene-runtime.mjs
           node --check dist/app/screenshot.mjs
           node --check dist/app/status-hud.mjs
           node --check dist/app/ui-controls.mjs
