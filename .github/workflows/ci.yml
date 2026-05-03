@@ -39,6 +39,7 @@ jobs:
           node --check app/screenshot.mjs
           node --check app/ui-controls.mjs
           node --check app/utils.mjs
+          node --check app/view-controls.mjs
           node --check scripts/serve-static.js
           node --check scripts/prepare-tauri-dist.js
 
@@ -58,6 +59,7 @@ jobs:
           node --check dist/app/screenshot.mjs
           node --check dist/app/ui-controls.mjs
           node --check dist/app/utils.mjs
+          node --check dist/app/view-controls.mjs
 
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
