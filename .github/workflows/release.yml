@@ -55,7 +55,9 @@ jobs:
         run: |
           node --check app.js
           node --check app/animations.mjs
+          node --check app/app-state.mjs
           node --check app/constants.mjs
+          node --check app/dom-elements.mjs
           node --check app/event-bindings.mjs
           node --check app/files.mjs
           node --check app/fbx-loader.mjs
@@ -83,7 +85,9 @@ jobs:
         run: |
           node --check dist/app.js
           node --check dist/app/animations.mjs
+          node --check dist/app/app-state.mjs
           node --check dist/app/constants.mjs
+          node --check dist/app/dom-elements.mjs
           node --check dist/app/event-bindings.mjs
           node --check dist/app/files.mjs
           node --check dist/app/fbx-loader.mjs
