@@ -30,6 +30,8 @@ jobs:
         run: |
           node --check app.js
           node --check app/constants.mjs
+          node --check app/files.mjs
+          node --check app/materials.mjs
           node --check app/measurements.mjs
           node --check app/resources.mjs
           node --check app/screenshot.mjs
@@ -44,6 +46,8 @@ jobs:
         run: |
           node --check dist/app.js
           node --check dist/app/constants.mjs
+          node --check dist/app/files.mjs
+          node --check dist/app/materials.mjs
           node --check dist/app/measurements.mjs
           node --check dist/app/resources.mjs
           node --check dist/app/screenshot.mjs
