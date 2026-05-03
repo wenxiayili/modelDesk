@@ -61,6 +61,7 @@ jobs:
           node --check app/lighting.mjs
           node --check app/materials.mjs
           node --check app/measurements.mjs
+          node --check app/report-export.mjs
           node --check app/resources.mjs
           node --check app/scene-meshes.mjs
           node --check app/scene-runtime.mjs
@@ -85,6 +86,7 @@ jobs:
           node --check dist/app/lighting.mjs
           node --check dist/app/materials.mjs
           node --check dist/app/measurements.mjs
+          node --check dist/app/report-export.mjs
           node --check dist/app/resources.mjs
           node --check dist/app/scene-meshes.mjs
           node --check dist/app/scene-runtime.mjs
