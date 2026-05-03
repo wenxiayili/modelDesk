@@ -57,6 +57,7 @@ jobs:
           node --check app/animations.mjs
           node --check app/constants.mjs
           node --check app/files.mjs
+          node --check app/lighting.mjs
           node --check app/materials.mjs
           node --check app/measurements.mjs
           node --check app/resources.mjs
@@ -75,6 +76,7 @@ jobs:
           node --check dist/app/animations.mjs
           node --check dist/app/constants.mjs
           node --check dist/app/files.mjs
+          node --check dist/app/lighting.mjs
           node --check dist/app/materials.mjs
           node --check dist/app/measurements.mjs
           node --check dist/app/resources.mjs
