@@ -1,6 +1,6 @@
 {
   "name": "modeldesk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A lightweight offline 3D model viewer built with Babylon.js and Tauri.",
   "license": "MIT",
   "homepage": "https://github.com/wenxiayili/modelDesk#readme",

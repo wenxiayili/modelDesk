@@ -1,6 +1,6 @@
 [package]
 name = "modeldesk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Lightweight Babylon.js model viewer"
 authors = ["ModelDesk"]
 license = "MIT"
