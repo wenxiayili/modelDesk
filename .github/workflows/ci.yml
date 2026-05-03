@@ -31,6 +31,7 @@ jobs:
           node --check app.js
           node --check app/animations.mjs
           node --check app/constants.mjs
+          node --check app/event-bindings.mjs
           node --check app/files.mjs
           node --check app/fbx-loader.mjs
           node --check app/lighting.mjs
@@ -57,6 +58,7 @@ jobs:
           node --check dist/app.js
           node --check dist/app/animations.mjs
           node --check dist/app/constants.mjs
+          node --check dist/app/event-bindings.mjs
           node --check dist/app/files.mjs
           node --check dist/app/fbx-loader.mjs
           node --check dist/app/lighting.mjs
