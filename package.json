@@ -26,6 +26,7 @@
     "frontend:dev": "node scripts/serve-static.js",
     "frontend:check": "node scripts/check-frontend.js",
     "frontend:build": "node scripts/prepare-tauri-dist.js",
+    "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "dev": "tauri dev",
