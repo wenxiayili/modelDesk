@@ -115,15 +115,31 @@
     metricFps: document.getElementById("metricFps")
   };
 
-  const supportedModels = [".glb", ".gltf", ".obj", ".stl", ".fbx", ".babylon"];
-  const modelPriority = [".glb", ".gltf", ".babylon", ".fbx", ".obj", ".stl"];
-  const textureExtensions = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tga", ".dds", ".ktx", ".ktx2", ".hdr"];
-  const materialExtensions = [".mtl"];
-  const bufferExtensions = [".bin"];
-  const environmentExtensions = [".env", ".hdr"];
-  const recentKey = "modeldesk.recent.v1";
-  const themeKey = "modeldesk.theme.v1";
-  const panelStateKey = "modeldesk.panels.v1";
+  const {
+    SUPPORTED_MODELS: supportedModels,
+    MODEL_PRIORITY: modelPriority,
+    TEXTURE_EXTENSIONS: textureExtensions,
+    MATERIAL_EXTENSIONS: materialExtensions,
+    BUFFER_EXTENSIONS: bufferExtensions,
+    ENVIRONMENT_EXTENSIONS: environmentExtensions,
+    RECENT_KEY: recentKey,
+    THEME_KEY: themeKey,
+    PANEL_STATE_KEY: panelStateKey
+  } = await import("./app/constants.mjs");
+  const {
+    getExtension,
+    stripExtension,
+    formatCount,
+    formatNumber,
+    describeModelFormat,
+    formatLoadedTime,
+    formatMeasureDistance,
+    formatMeasureAxis,
+    formatMeasureVector,
+    formatBytes,
+    formatError,
+    escapeHtml
+  } = await import("./app/utils.mjs");
   let fbxLoaderPromise = null;
 
   const state = {
@@ -203,6 +219,45 @@
     els.engineStatus.textContent = "引擎未就绪";
     return;
   }
+
+  const { createScreenshotTools } = await import("./app/screenshot.mjs");
+  const {
+    toggleScreenshotPopover,
+    closeScreenshotPopover,
+    exportScreenshot
+  } = createScreenshotTools({
+    els,
+    state,
+    BABYLON: window.BABYLON,
+    closeUtilityPopovers,
+    setStatus,
+    stripExtension
+  });
+
+  const { createMeasurementTools } = await import("./app/measurements.mjs");
+  const {
+    toggleMeasureMode,
+    setMeasureMode,
+    handleMeasureCanvasClick,
+    renderMeasurePanel,
+    clearMeasurement,
+    clearMeasurementHistory,
+    updateMeasureLabel
+  } = createMeasurementTools({
+    els,
+    state,
+    BABYLON: window.BABYLON,
+    setPanMode,
+    setStatus,
+    updateViewChip,
+    calculateBounds,
+    isPickableModelMesh,
+    formatMeasureDistance,
+    formatMeasureAxis,
+    formatMeasureVector,
+    formatCount,
+    escapeHtml
+  });
 
   initScene();
   applyStoredTheme();
@@ -1665,414 +1720,9 @@
     els.viewportWrap?.classList.remove("is-pan-dragging");
   }
 
-  function toggleMeasureMode() {
-    if (!state.activeContainer) {
-      setStatus("请先加载模型", true);
-      return;
-    }
-    setMeasureMode(!state.measureMode);
-  }
-
-  function setMeasureMode(enabled, options = {}) {
-    state.measureMode = Boolean(enabled);
-    els.viewMeasureButton?.classList.toggle("is-active", state.measureMode);
-    els.viewportWrap?.classList.toggle("is-measuring", state.measureMode);
-
-    if (state.measureMode) {
-      setPanMode(false, { quiet: true });
-      clearMeasurement({ keepHistory: true });
-      setStatus("测量模式：点击模型上的第一个点");
-    } else if (!options.quiet) {
-      setStatus(state.activeFile ? `已加载 ${state.activeFile.name}` : "就绪");
-    }
-
-    updateViewChip();
-  }
-
-  function handleMeasureCanvasClick(event) {
-    if (!state.measureMode || !state.scene) return;
-    const rect = els.canvas.getBoundingClientRect();
-    const pickInfo = state.scene.pick(event.clientX - rect.left, event.clientY - rect.top);
-    handleMeasurePick(pickInfo);
-  }
-
-  function handleMeasurePick(pickInfo) {
-    if (!state.measureMode) return;
-    if (!pickInfo?.hit || !pickInfo.pickedPoint || !isPickableModelMesh(pickInfo.pickedMesh)) {
-      setStatus("测量模式：请点击模型表面", true);
-      return;
-    }
-
-    addMeasurePoint(pickInfo.pickedPoint);
-  }
-
-  function addMeasurePoint(point) {
-    if (state.measurePoints.length >= 2) {
-      clearMeasurement({ keepHistory: true });
-    }
-
-    const measuredPoint = point.clone();
-    state.measurePoints.push(measuredPoint);
-    drawMeasurePoint(measuredPoint);
-
-    if (state.measurePoints.length === 1) {
-      setStatus("测量模式：点击第二个点");
-      return;
-    }
-
-    const [start, end] = state.measurePoints;
-    drawMeasureLine(start, end);
-    const measurement = createMeasurementRecord(start, end);
-    state.measurements.unshift(measurement);
-    state.measurements = state.measurements.slice(0, 8);
-    updateMeasureLabel();
-    renderMeasurePanel();
-    setMeasureMode(false, { quiet: true });
-    setStatus(`测量距离：${formatMeasureDistance(measurement.distance)}，Δ ${formatMeasureVector(measurement.delta)}`);
-  }
-
-  function drawMeasurePoint(point) {
-    const diameter = getMeasurePointDiameter();
-    const marker = BABYLON.MeshBuilder.CreateSphere(
-      `measurePoint${state.measurePoints.length}`,
-      { diameter, segments: 18 },
-      state.scene
-    );
-    marker.position.copyFrom(point);
-    marker.material = getMeasureMaterial();
-    marker.isPickable = false;
-    marker.metadata = { modelDeskUtility: true };
-    state.measureMeshes.push(marker);
-  }
-
-  function drawMeasureLine(start, end) {
-    const line = BABYLON.MeshBuilder.CreateLines("measureLine", { points: [start, end] }, state.scene);
-    line.color = new BABYLON.Color3(0.24, 0.9, 0.84);
-    line.isPickable = false;
-    line.metadata = { modelDeskUtility: true };
-    state.measureMeshes.push(line);
-  }
-
-  function getMeasureMaterial() {
-    if (!state.measureMaterial || state.measureMaterial.isDisposed?.()) {
-      const material = new BABYLON.StandardMaterial("measureMarkerMaterial", state.scene);
-      material.diffuseColor = new BABYLON.Color3(0.12, 0.82, 0.76);
-      material.emissiveColor = new BABYLON.Color3(0.08, 0.62, 0.58);
-      material.specularColor = new BABYLON.Color3(0.75, 1, 0.96);
-      material.disableLighting = true;
-      state.measureMaterial = material;
-    }
-    return state.measureMaterial;
-  }
-
-  function getMeasurePointDiameter() {
-    const bounds = state.modelBounds || calculateBounds();
-    if (!bounds) return 0.06;
-    const diagonal = bounds.max.subtract(bounds.min).length();
-    return Math.max(diagonal * 0.014, 0.025);
-  }
-
-  function createMeasurementRecord(start, end) {
-    const delta = end.subtract(start);
-    return {
-      distance: BABYLON.Vector3.Distance(start, end),
-      delta: {
-        x: delta.x,
-        y: delta.y,
-        z: delta.z
-      },
-      createdAt: Date.now()
-    };
-  }
-
-  function renderMeasurePanel() {
-    if (!els.measureSummary || !els.measureHistory) return;
-
-    const bounds = state.modelBounds || (state.activeContainer ? calculateBounds() : null);
-    const size = bounds ? bounds.max.subtract(bounds.min) : null;
-    const latest = state.measurements[0];
-    const boundsText = size
-      ? `包围盒 ${formatMeasureAxis(size.x)} x ${formatMeasureAxis(size.y)} x ${formatMeasureAxis(size.z)}`
-      : "未载入模型";
-
-    if (els.measurePanelTitle) {
-      els.measurePanelTitle.textContent = state.measurements.length
-        ? `测量 (${formatCount(state.measurements.length)})`
-        : "测量";
-    }
-    if (els.measureClearButton) {
-      els.measureClearButton.disabled = state.measurements.length === 0 && state.measurePoints.length === 0;
-    }
-
-    els.measureSummary.textContent = latest
-      ? `最新 ${formatMeasureDistance(latest.distance)} · ${boundsText}`
-      : boundsText;
-
-    if (!state.measurements.length) {
-      els.measureHistory.innerHTML = "";
-      return;
-    }
-
-    els.measureHistory.innerHTML = state.measurements
-      .map((measurement, index) => `<div class="measure-row">
-        <span>#${index + 1}</span>
-        <strong>${escapeHtml(formatMeasureDistance(measurement.distance))}</strong>
-        <small>${escapeHtml(formatMeasureVector(measurement.delta))}</small>
-      </div>`)
-      .join("");
-  }
-
-  function clearMeasurement(options = {}) {
-    state.measureMeshes.forEach((mesh) => mesh.dispose(false, true));
-    state.measureMeshes = [];
-    state.measurePoints = [];
-    if (!options.keepHistory) {
-      state.measurements = [];
-    }
-    if (els.measureLabel) {
-      els.measureLabel.hidden = true;
-      els.measureLabel.textContent = "";
-    }
-    renderMeasurePanel();
-  }
-
-  function clearMeasurementHistory() {
-    clearMeasurement();
-    setStatus("已清空测量记录");
-  }
-
-  function updateMeasureLabel() {
-    if (!els.measureLabel || state.measurePoints.length < 2 || !state.engine || !state.camera) return;
-
-    const [start, end] = state.measurePoints;
-    const midpoint = BABYLON.Vector3.Center(start, end);
-    const renderWidth = state.engine.getRenderWidth();
-    const renderHeight = state.engine.getRenderHeight();
-    const viewport = state.camera.viewport.toGlobal(renderWidth, renderHeight);
-    const projected = BABYLON.Vector3.Project(
-      midpoint,
-      BABYLON.Matrix.Identity(),
-      state.scene.getTransformMatrix(),
-      viewport
-    );
-
-    if (
-      !Number.isFinite(projected.x) ||
-      !Number.isFinite(projected.y) ||
-      projected.z < 0 ||
-      projected.z > 1
-    ) {
-      els.measureLabel.hidden = true;
-      return;
-    }
-
-    const canvasRect = els.canvas.getBoundingClientRect();
-    const x = (projected.x / renderWidth) * canvasRect.width;
-    const y = (projected.y / renderHeight) * canvasRect.height;
-    els.measureLabel.textContent = formatMeasureDistance(BABYLON.Vector3.Distance(start, end));
-    els.measureLabel.style.left = `${x}px`;
-    els.measureLabel.style.top = `${y}px`;
-    els.measureLabel.hidden = false;
-  }
-
   function isPickableModelMesh(mesh) {
     if (!mesh || mesh.metadata?.modelDeskUtility) return false;
     return Boolean(state.activeContainer?.meshes?.includes(mesh));
-  }
-
-  function toggleScreenshotPopover(event) {
-    event?.stopPropagation();
-    if (!els.screenshotPopover) {
-      exportScreenshot("save");
-      return;
-    }
-
-    const shouldOpen = els.screenshotPopover.hidden;
-    closeUtilityPopovers();
-    els.screenshotPopover.hidden = !shouldOpen;
-    els.shotButton?.classList.toggle("is-active", shouldOpen);
-    els.viewShotButton?.classList.toggle("is-active", shouldOpen);
-    if (shouldOpen) {
-      els.screenshotScaleSelect?.focus();
-    }
-  }
-
-  function closeScreenshotPopover() {
-    if (!els.screenshotPopover) return;
-    els.screenshotPopover.hidden = true;
-    els.shotButton?.classList.remove("is-active");
-    els.viewShotButton?.classList.remove("is-active");
-  }
-
-  async function saveScreenshot() {
-    return exportScreenshot("save");
-  }
-
-  async function exportScreenshot(mode) {
-    if (!state.engine || !state.scene) return;
-    const scale = Number(els.screenshotScaleSelect?.value || 1);
-    const transparent = Boolean(els.screenshotTransparentToggle?.checked);
-
-    setScreenshotBusy(true);
-    try {
-      const screenshot = await createScreenshotBlob({
-        scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
-        transparent
-      });
-
-      if (mode === "copy") {
-        await copyBlobToClipboard(screenshot.blob);
-        setStatus(`截图已复制到剪贴板：${screenshot.width} x ${screenshot.height}`);
-        return;
-      }
-
-      const fileName = buildScreenshotFileName(screenshot.scale, transparent);
-      const saved = await saveScreenshotBlob(screenshot.blob, fileName);
-      if (saved.canceled) {
-        setStatus("已取消截图保存");
-      } else if (saved.path) {
-        setStatus(`截图已保存：${saved.path}`);
-      } else {
-        setStatus(`截图已导出：${screenshot.scale}x PNG`);
-      }
-    } catch (error) {
-      console.error(error);
-      setStatus(mode === "copy" ? "当前环境不支持复制 PNG，请使用保存。" : "截图导出失败。", true);
-    } finally {
-      setScreenshotBusy(false);
-    }
-  }
-
-  async function createScreenshotBlob(options) {
-    const selectedScale = Math.min(Math.max(Number(options.scale) || 1, 1), 3);
-    const previousClearColor = state.scene.clearColor?.clone
-      ? state.scene.clearColor.clone()
-      : new BABYLON.Color4(0.065, 0.085, 0.11, 1);
-
-    let captureCanvas;
-    try {
-      if (options.transparent) {
-        state.scene.clearColor = new BABYLON.Color4(
-          previousClearColor.r,
-          previousClearColor.g,
-          previousClearColor.b,
-          0
-        );
-      }
-      state.scene.render();
-      captureCanvas = copyCanvasForExport(els.canvas, selectedScale);
-    } finally {
-      state.scene.clearColor = previousClearColor;
-      state.scene.render();
-    }
-
-    const blob = await canvasToBlob(captureCanvas, "image/png");
-    if (!blob) {
-      throw new Error("无法编码截图");
-    }
-
-    return {
-      blob,
-      scale: selectedScale,
-      width: captureCanvas.width,
-      height: captureCanvas.height
-    };
-  }
-
-  function copyCanvasForExport(sourceCanvas, scale) {
-    const targetCanvas = document.createElement("canvas");
-    targetCanvas.width = Math.max(1, Math.round(sourceCanvas.width * scale));
-    targetCanvas.height = Math.max(1, Math.round(sourceCanvas.height * scale));
-
-    const context = targetCanvas.getContext("2d");
-    if (!context) {
-      throw new Error("无法创建截图画布");
-    }
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.drawImage(sourceCanvas, 0, 0, targetCanvas.width, targetCanvas.height);
-    return targetCanvas;
-  }
-
-  function canvasToBlob(canvas, type) {
-    if (canvas.toBlob) {
-      return new Promise((resolve) => canvas.toBlob(resolve, type));
-    }
-
-    const dataUrl = canvas.toDataURL(type);
-    const [header, data] = dataUrl.split(",");
-    const mimeMatch = header.match(/data:(.*);base64/);
-    const mimeType = mimeMatch?.[1] || type || "image/png";
-    const binary = window.atob(data);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-    return Promise.resolve(new Blob([bytes], { type: mimeType }));
-  }
-
-  async function copyBlobToClipboard(blob) {
-    if (!navigator.clipboard?.write || !window.ClipboardItem) {
-      throw new Error("当前系统不支持写入剪贴板图片");
-    }
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-  }
-
-  async function saveScreenshotBlob(blob, fileName) {
-    const invoke = window.__TAURI__?.core?.invoke;
-    if (invoke) {
-      const data = await blobToBase64(blob);
-      const path = await invoke("save_png_with_dialog", { data, name: fileName });
-      return path ? { path } : { canceled: true };
-    }
-
-    downloadBlob(blob, fileName);
-    return { path: "" };
-  }
-
-  function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.addEventListener("load", () => {
-        const result = String(reader.result || "");
-        resolve(result.includes(",") ? result.split(",").pop() : result);
-      });
-      reader.addEventListener("error", () => reject(reader.error || new Error("无法读取截图数据")));
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  function downloadBlob(blob, fileName) {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    link.addEventListener("click", (event) => event.stopPropagation());
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  function buildScreenshotFileName(scale, transparent) {
-    const baseName = state.activeFile ? stripExtension(state.activeFile.name) : "模型工作台";
-    const suffix = transparent ? `-${scale}倍-透明` : `-${scale}倍`;
-    return `${sanitizeFileName(baseName)}-视图${suffix}.png`;
-  }
-
-  function sanitizeFileName(name) {
-    return String(name || "模型工作台")
-      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 120) || "模型工作台";
-  }
-
-  function setScreenshotBusy(isBusy) {
-    els.screenshotPopover?.setAttribute("aria-busy", String(isBusy));
-    [els.screenshotSaveButton, els.screenshotCopyButton].forEach((button) => {
-      if (button) button.disabled = isBusy;
-    });
   }
 
   async function toggleViewportFullscreen() {
@@ -3196,88 +2846,4 @@
     }
   }
 
-  function getExtension(name) {
-    const dot = name.lastIndexOf(".");
-    return dot >= 0 ? name.slice(dot).toLowerCase() : "";
-  }
-
-  function stripExtension(name) {
-    const dot = name.lastIndexOf(".");
-    return dot > 0 ? name.slice(0, dot) : name;
-  }
-
-  function formatCount(value) {
-    return new Intl.NumberFormat("zh-CN").format(value || 0);
-  }
-
-  function formatNumber(value) {
-    return Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
-  }
-
-  function describeModelFormat(name) {
-    const extension = getExtension(name);
-    const formats = {
-      ".glb": "glTF 二进制 (.glb)",
-      ".gltf": "glTF 2.0 (.gltf)",
-      ".obj": "OBJ 模型",
-      ".stl": "STL",
-      ".fbx": "FBX 模型",
-      ".babylon": "Babylon 场景"
-    };
-    return formats[extension] || extension.replace(".", "").toUpperCase() || "未知";
-  }
-
-  function formatLoadedTime(date) {
-    return new Intl.DateTimeFormat("zh-CN", {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit"
-    }).format(date);
-  }
-
-  function formatMeasureDistance(value) {
-    const distance = Number(value || 0);
-    const maximumFractionDigits = distance < 1 ? 4 : distance < 100 ? 3 : 2;
-    return `${distance.toLocaleString("zh-CN", { maximumFractionDigits })} 模型单位`;
-  }
-
-  function formatMeasureAxis(value) {
-    const number = Number(value || 0);
-    const maximumFractionDigits = Math.abs(number) < 1 ? 4 : Math.abs(number) < 100 ? 3 : 2;
-    return number.toLocaleString("zh-CN", { maximumFractionDigits });
-  }
-
-  function formatMeasureVector(delta) {
-    return `X ${formatMeasureAxis(delta.x)}, Y ${formatMeasureAxis(delta.y)}, Z ${formatMeasureAxis(delta.z)}`;
-  }
-
-  function formatBytes(bytes) {
-    if (!bytes) return "0 B";
-    const units = ["B", "KB", "MB", "GB"];
-    let size = bytes;
-    let unit = 0;
-    while (size >= 1024 && unit < units.length - 1) {
-      size /= 1024;
-      unit += 1;
-    }
-    return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
-  }
-
-  function formatError(error) {
-    const message = error?.message || String(error);
-    if (/Unable to load|404|Not Found/i.test(message)) {
-      return "模型资源不完整，请同时选择 .gltf 关联的 .bin / 贴图文件，或使用文件夹导入。";
-    }
-    return `加载失败：${message}`;
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
 })();
