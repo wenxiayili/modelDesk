@@ -27,59 +27,13 @@ jobs:
         run: npm ci
 
       - name: Check frontend source
-        run: |
-          node --check app.js
-          node --check app/animations.mjs
-          node --check app/app-state.mjs
-          node --check app/constants.mjs
-          node --check app/dom-elements.mjs
-          node --check app/event-bindings.mjs
-          node --check app/files.mjs
-          node --check app/fbx-loader.mjs
-          node --check app/lighting.mjs
-          node --check app/materials.mjs
-          node --check app/measurements.mjs
-          node --check app/model-packages.mjs
-          node --check app/model-session.mjs
-          node --check app/report-export.mjs
-          node --check app/resources.mjs
-          node --check app/scene-meshes.mjs
-          node --check app/scene-runtime.mjs
-          node --check app/screenshot.mjs
-          node --check app/status-hud.mjs
-          node --check app/ui-controls.mjs
-          node --check app/utils.mjs
-          node --check app/view-controls.mjs
-          node --check scripts/serve-static.js
-          node --check scripts/prepare-tauri-dist.js
+        run: node scripts/check-frontend.js
 
       - name: Prepare Tauri frontend assets
         run: node scripts/prepare-tauri-dist.js
 
       - name: Check built frontend source
-        run: |
-          node --check dist/app.js
-          node --check dist/app/animations.mjs
-          node --check dist/app/app-state.mjs
-          node --check dist/app/constants.mjs
-          node --check dist/app/dom-elements.mjs
-          node --check dist/app/event-bindings.mjs
-          node --check dist/app/files.mjs
-          node --check dist/app/fbx-loader.mjs
-          node --check dist/app/lighting.mjs
-          node --check dist/app/materials.mjs
-          node --check dist/app/measurements.mjs
-          node --check dist/app/model-packages.mjs
-          node --check dist/app/model-session.mjs
-          node --check dist/app/report-export.mjs
-          node --check dist/app/resources.mjs
-          node --check dist/app/scene-meshes.mjs
-          node --check dist/app/scene-runtime.mjs
-          node --check dist/app/screenshot.mjs
-          node --check dist/app/status-hud.mjs
-          node --check dist/app/ui-controls.mjs
-          node --check dist/app/utils.mjs
-          node --check dist/app/view-controls.mjs
+        run: node scripts/check-frontend.js dist
 
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
