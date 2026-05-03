@@ -245,6 +245,7 @@
     setCameraPreset,
     toggleWireframe,
     toggleAutoRotate,
+    setPanMode,
     togglePanMode,
     handlePanPointerDown,
     handlePanPointerMove,

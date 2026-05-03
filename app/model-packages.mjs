@@ -8,7 +8,11 @@ export function createModelPackageTools(config) {
   } = config;
 
   function bindRuntimeOpenEvents() {
-    const listen = window.__TAURI__?.event?.listen;
+    bindRuntimeOpenEventsWhenReady();
+  }
+
+  async function bindRuntimeOpenEventsWhenReady() {
+    const listen = await waitForTauriApi(() => window.__TAURI__?.event?.listen);
     if (!listen) return;
 
     listen("modeldesk-open-model-package", async (event) => {
@@ -36,7 +40,7 @@ export function createModelPackageTools(config) {
   }
 
   async function openModelFolder() {
-    const invoke = window.__TAURI__?.core?.invoke;
+    const invoke = await waitForTauriApi(() => window.__TAURI__?.core?.invoke, 800);
     if (!invoke) {
       els.folderInput?.click();
       return;
@@ -57,7 +61,7 @@ export function createModelPackageTools(config) {
   }
 
   async function loadLaunchModelPackage() {
-    const invoke = window.__TAURI__?.core?.invoke;
+    const invoke = await waitForTauriApi(() => window.__TAURI__?.core?.invoke);
     if (!invoke) return;
 
     try {
@@ -118,6 +122,25 @@ export function createModelPackageTools(config) {
       ".webp": "image/webp"
     };
     return types[extension] || "application/octet-stream";
+  }
+
+  function waitForTauriApi(getter, timeout = 3000) {
+    const startedAt = Date.now();
+    return new Promise((resolve) => {
+      const tick = () => {
+        const api = getter();
+        if (api) {
+          resolve(api);
+          return;
+        }
+        if (Date.now() - startedAt >= timeout) {
+          resolve(null);
+          return;
+        }
+        window.setTimeout(tick, 25);
+      };
+      tick();
+    });
   }
 
   return {
