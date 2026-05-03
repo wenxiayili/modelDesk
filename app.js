@@ -258,6 +258,19 @@
     normalizeResourcePath
   });
 
+  const { createUiControls } = await import("./app/ui-controls.mjs");
+  const {
+    bindCollapsiblePanels,
+    bindUtilityControls,
+    applyStoredTheme,
+    closeUtilityPopovers
+  } = createUiControls({
+    els,
+    panelStateKey,
+    themeKey,
+    setStatus
+  });
+
   if (!window.BABYLON) {
     setStatus("Babylon.js 未加载，请检查网络或改成本地依赖。", true);
     els.engineStatus.textContent = "引擎未就绪";
@@ -328,6 +341,26 @@
     renderMeshes,
     clearSceneHighlight,
     setStatus
+  });
+
+  const { createAnimationTools } = await import("./app/animations.mjs");
+  const {
+    setupAnimations,
+    resetAnimations,
+    selectAnimation,
+    handleAnimationListClick,
+    toggleAnimationPlayback,
+    stopActiveAnimation,
+    applyAnimationSpeed,
+    renderAnimations
+  } = createAnimationTools({
+    els,
+    state,
+    readControlNumber,
+    formatCount,
+    escapeHtml,
+    setStatus,
+    updateViewChip
   });
 
   initScene();
@@ -583,38 +616,6 @@
     bindCollapsiblePanels();
   }
 
-  function bindCollapsiblePanels() {
-    const panelStates = readPanelStates();
-    document.querySelectorAll("[data-collapsible-panel]").forEach((panel) => {
-      const key = panel.dataset.panelKey || "";
-      const toggle = panel.querySelector("[data-panel-toggle]");
-      setPanelCollapsed(panel, Boolean(panelStates[key]), { persist: false });
-      toggle?.addEventListener("click", () => {
-        setPanelCollapsed(panel, !panel.classList.contains("is-collapsed"));
-      });
-    });
-  }
-
-  function setPanelCollapsed(panel, collapsed, options = {}) {
-    panel.classList.toggle("is-collapsed", collapsed);
-    const toggle = panel.querySelector("[data-panel-toggle]");
-    toggle?.setAttribute("aria-expanded", String(!collapsed));
-    if (options.persist === false) return;
-    const key = panel.dataset.panelKey;
-    if (!key) return;
-    const panelStates = readPanelStates();
-    panelStates[key] = Boolean(collapsed);
-    window.localStorage.setItem(panelStateKey, JSON.stringify(panelStates));
-  }
-
-  function readPanelStates() {
-    try {
-      return JSON.parse(window.localStorage.getItem(panelStateKey) || "{}") || {};
-    } catch {
-      return {};
-    }
-  }
-
   function bindExposureControl() {
     bindRangeNumberPair(els.exposureRange, els.exposureValue, () => {
       if (state.scene) {
@@ -652,71 +653,6 @@
       els.hdriInput.value = "";
     });
     updateEnvironmentUi();
-  }
-
-  function bindUtilityControls() {
-    els.themeButton?.addEventListener("click", toggleTheme);
-    els.settingsButton?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      togglePopover(els.settingsPopover, els.helpPopover);
-    });
-    els.helpButton?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      togglePopover(els.helpPopover, els.settingsPopover);
-    });
-    document.addEventListener("click", (event) => {
-      if (!event.target.closest(".utility-popover") && !event.target.closest(".utility-actions")) {
-        closeUtilityPopovers();
-      }
-    });
-    bindQuickToggle(els.quickGridToggle, els.gridToggle);
-    bindQuickToggle(els.quickAxisToggle, els.axisToggle);
-    bindQuickToggle(els.quickEnvToggle, els.envToggle);
-    syncQuickToggles();
-  }
-
-  function bindQuickToggle(quickToggle, sourceToggle) {
-    quickToggle?.addEventListener("change", () => setSourceToggle(sourceToggle, quickToggle.checked));
-    sourceToggle?.addEventListener("change", syncQuickToggles);
-  }
-
-  function setSourceToggle(sourceToggle, checked) {
-    if (!sourceToggle || sourceToggle.checked === checked) return;
-    sourceToggle.checked = checked;
-    sourceToggle.dispatchEvent(new Event("change", { bubbles: true }));
-  }
-
-  function syncQuickToggles() {
-    if (els.quickGridToggle) els.quickGridToggle.checked = els.gridToggle.checked;
-    if (els.quickAxisToggle) els.quickAxisToggle.checked = els.axisToggle.checked;
-    if (els.quickEnvToggle) els.quickEnvToggle.checked = els.envToggle.checked;
-  }
-
-  function togglePopover(target, other) {
-    if (!target) return;
-    const show = target.hidden;
-    closeUtilityPopovers();
-    if (other) other.hidden = true;
-    target.hidden = !show;
-  }
-
-  function closeUtilityPopovers() {
-    if (els.settingsPopover) els.settingsPopover.hidden = true;
-    if (els.helpPopover) els.helpPopover.hidden = true;
-  }
-
-  function applyStoredTheme() {
-    const theme = window.localStorage.getItem(themeKey) || "light";
-    document.body.classList.toggle("is-dark", theme === "dark");
-    els.themeButton?.classList.toggle("is-active", theme === "dark");
-  }
-
-  function toggleTheme() {
-    const dark = !document.body.classList.contains("is-dark");
-    document.body.classList.toggle("is-dark", dark);
-    els.themeButton?.classList.toggle("is-active", dark);
-    window.localStorage.setItem(themeKey, dark ? "dark" : "light");
-    setStatus(dark ? "已切换深色主题" : "已切换浅色主题");
   }
 
   function loadStudioEnvironment() {
@@ -1534,149 +1470,6 @@
     setFooterMetrics({ triangles, vertices, meshes: meshes.length, materials: materials.length });
     renderMeasurePanel();
     updateViewChip();
-  }
-
-  function setupAnimations(container) {
-    resetAnimations({ keepUi: true });
-    const groups = Array.from(container.animationGroups || []);
-    state.animationItems = groups.map((group, index) => ({
-      group,
-      index,
-      name: group.name || `Animation ${index + 1}`,
-      playable: typeof group.play === "function" && typeof group.stop === "function"
-    }));
-    state.activeAnimationIndex = state.animationItems.findIndex((item) => item.playable);
-    if (state.activeAnimationIndex < 0 && state.animationItems.length) {
-      state.activeAnimationIndex = 0;
-    }
-    applyAnimationSpeed();
-    renderAnimations();
-  }
-
-  function resetAnimations(options = {}) {
-    stopAllAnimations();
-    state.animationItems = [];
-    state.activeAnimationIndex = -1;
-    state.animationPlaying = false;
-    if (!options.keepUi) renderAnimations();
-    updateViewChip();
-  }
-
-  function stopAllAnimations() {
-    state.animationItems.forEach((item) => {
-      if (typeof item.group?.stop === "function") item.group.stop();
-    });
-  }
-
-  function selectAnimation(index) {
-    if (!Number.isFinite(index) || index < 0 || index >= state.animationItems.length) return;
-    const current = getActiveAnimationItem();
-    if (current?.playable) current.group.stop();
-    state.animationPlaying = false;
-    state.activeAnimationIndex = index;
-    applyAnimationSpeed();
-    renderAnimations();
-    const item = getActiveAnimationItem();
-    setStatus(item?.playable ? `已选择动画 ${item.name}` : "该动画格式暂不支持播放");
-    updateViewChip();
-  }
-
-  function handleAnimationListClick(event) {
-    const item = event.target.closest("[data-animation-index]");
-    if (!item || !els.animationList?.contains(item)) return;
-    selectAnimation(Number(item.dataset.animationIndex));
-  }
-
-  function toggleAnimationPlayback() {
-    const item = getActiveAnimationItem();
-    if (!item?.playable) {
-      setStatus(state.animationItems.length ? "该动画格式暂不支持播放" : "当前模型没有动画", true);
-      return;
-    }
-
-    if (state.animationPlaying) {
-      if (typeof item.group.pause === "function") {
-        item.group.pause();
-      } else {
-        item.group.stop();
-      }
-      state.animationPlaying = false;
-      setStatus(`已暂停动画 ${item.name}`);
-    } else {
-      item.group.speedRatio = state.animationSpeed;
-      item.group.play(true);
-      state.animationPlaying = true;
-      setStatus(`正在播放动画 ${item.name}`);
-    }
-    renderAnimations();
-    updateViewChip();
-  }
-
-  function stopActiveAnimation() {
-    const item = getActiveAnimationItem();
-    if (!item?.playable) return;
-    item.group.stop();
-    state.animationPlaying = false;
-    renderAnimations();
-    updateViewChip();
-    setStatus(`已停止动画 ${item.name}`);
-  }
-
-  function applyAnimationSpeed() {
-    state.animationSpeed = readControlNumber(els.animationSpeedRange, 1);
-    state.animationItems.forEach((item) => {
-      if (item.playable) item.group.speedRatio = state.animationSpeed;
-    });
-  }
-
-  function getActiveAnimationItem() {
-    return state.animationItems[state.activeAnimationIndex] || null;
-  }
-
-  function renderAnimations() {
-    const items = state.animationItems;
-    const activeItem = getActiveAnimationItem();
-    const canPlay = Boolean(activeItem?.playable);
-
-    if (els.animationPanelTitle) {
-      els.animationPanelTitle.textContent = items.length ? `动画 (${formatCount(items.length)})` : "动画";
-    }
-
-    if (els.animationSelect) {
-      els.animationSelect.disabled = !items.length;
-      els.animationSelect.innerHTML = items.length
-        ? items.map((item, index) => `<option value="${index}">${escapeHtml(item.name)}${item.playable ? "" : "（仅查看）"}</option>`).join("")
-        : `<option value="">无动画</option>`;
-      els.animationSelect.value = state.activeAnimationIndex >= 0 ? String(state.activeAnimationIndex) : "";
-    }
-
-    [els.animationPlayButton, els.animationStopButton, els.animationSpeedRange, els.animationSpeedValue].forEach((control) => {
-      if (control) control.disabled = !canPlay;
-    });
-    els.animationPlayButton?.classList.toggle("is-active", state.animationPlaying);
-
-    if (!els.animationList) return;
-    if (!items.length) {
-      els.animationList.className = "empty-list";
-      els.animationList.textContent = "未载入动画";
-      return;
-    }
-
-    els.animationList.className = "animation-list";
-    els.animationList.innerHTML = items.map((item, index) => {
-      const classes = [
-        "animation-item",
-        index === state.activeAnimationIndex ? "is-active" : "",
-        item.playable ? "" : "is-muted"
-      ].filter(Boolean).join(" ");
-      const status = item.playable
-        ? (index === state.activeAnimationIndex && state.animationPlaying ? "播放中" : "就绪")
-        : "仅查看";
-      return `<div class="${classes}" data-animation-index="${index}">
-        <span title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
-        <small>${status}</small>
-      </div>`;
-    }).join("");
   }
 
   function setInfo(info = {}) {
