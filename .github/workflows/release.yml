@@ -66,6 +66,37 @@ jobs:
       - name: Check Rust
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
+      - name: Generate release notes from git messages
+        shell: pwsh
+        run: |
+          $previousTag = git describe --tags --abbrev=0 "$env:RELEASE_TAG^" 2>$null
+          if ($LASTEXITCODE -eq 0 -and $previousTag) {
+            $range = "$previousTag..$env:RELEASE_TAG"
+          } else {
+            $range = $env:RELEASE_TAG
+          }
+
+          $messages = git log $range --pretty=format:"- %h %s"
+          if (-not $messages) {
+            $messages = @("- No commits found for $env:RELEASE_TAG")
+          }
+
+          $body = @(
+            "## Git messages",
+            "",
+            $messages,
+            "",
+            "## Windows installers",
+            "",
+            "Windows installers are attached below.",
+            "",
+            "This release is unsigned. Windows may show a SmartScreen warning on first launch."
+          )
+
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_BODY<<MODEL_DESK_RELEASE_BODY"
+          Add-Content -Path $env:GITHUB_ENV -Value $body
+          Add-Content -Path $env:GITHUB_ENV -Value "MODEL_DESK_RELEASE_BODY"
+
       - name: Build and draft GitHub Release
         uses: tauri-apps/tauri-action@v0.6.2
         env:
@@ -73,9 +104,6 @@ jobs:
         with:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: "ModelDesk ${{ env.RELEASE_TAG }}"
-          releaseBody: |
-            Windows installers are attached below.
-
-            This release is unsigned. Windows may show a SmartScreen warning on first launch.
+          releaseBody: ${{ env.RELEASE_BODY }}
           releaseDraft: true
           prerelease: ${{ env.IS_PRERELEASE }}
